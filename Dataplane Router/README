@@ -1,0 +1,36 @@
+Tema 1 - PCom
+- la inceput sunt alocate tabelele de rutare si de arp, tabela de rutare este citita utilizand functia read_rtable si mai apoi sortata crescator de la cel mai mic prefix la cel mai mare (utilizand functia ntohl pt a fi convertit numarul ce reprezinta adresa din big endian in little endian); daca prefixele sunt identice, se sorteaza crescator, dupa masca
+- se creeaza coada unde se stocheaza temporar pachetele despre care nu se stie inca macul destinatie
+- se citeste fiecare pachet in parte; se retine interfata; se verifica ca macul destinatie sa corespunda cu macul routerului
+- apoi se verifica in headerul ip daca campul corespunzator tipului contine numarul corespunzator IPv4 sau ARP - se foloseste ntohs (ether_type e pe 16 biti)
+- daca este IPV4, se obtine ip-ul in format numar utilizand functia auxiliara get_interface_ip_as_int
+- daca ip-ul destinatie corespunde cu ip-ul interfetei routerului, pachetul va ramane in router; se trimite pachet icmp
+- altfel. se verifica checksumul
+- se verifica ttl-ul; daca nu e mai mare ca 0 sau 1, atunci se trimite pachet icmp; altfel se descrementeaza ttl-ul si se actualizeaza checksumul
+- se obtine ruta perfecta din tabela de rutare, utilizand functia get_best_route, care face o cautare binara modificata in tabela de rutare; asadar daca prefixul curent este egal cu ipul destinatie & masca pe biti => se salveaza ruta curenta intr-un pointer; se va trece la stanga pentru a incerca sa gasim o masca mai mare pentru prefixul curent si sa actualizam best_route
+- daca ip-ul primit nu are o intrare corespunzatoare in tabela de rutare => se trimite pachet icmp de eroare
+- se cauta in arp table o intrare ce corespunde cu adresa ip a urmatorului hop din best_route; get_arp_entry face cautare in tabela arp si compara ip-urile pt a intoarce primul match
+- daca nu gasim nicio intrare in tabela arp => adaugam pachetul in coada de waiting si se creeaza un pachet arp nou format din ether_header + arp_header
+- in ether_header se seteaza adresa mac destinatie ca adresa de broadcast cu 0xff; adresa mac sursa ca adresa mac a interfetei curente si ether-type se seteaza ca 0x806 (ARP)
+- se seteaza campurile din pachetul arp - sha va fi macul interfetei curente; tha va fi zeroizat la inceput
+- spa va fi ipul interfetei curente, tpa va fi next_hop-ul
+- se transmite pachetul ARP
+- daca in schimb exista o intrare corespunzatoare in ARP table, atunci se modifica mac-ul sursa si mac-ul destinatie (mac sursa este cel al interfetei curente; mac destinatie este cel gasit in arp table
+- se trimite pachetul IPv4
+- daca in schiumb pachetul primit este de tip ARP:
+- se verifica tipul, daca este request sau reply
+- daca este request, se modifica campul op pentru a representa ca vom trimite un reply; se interschimba adresele ip din ARP header intre ele, adresa mac destinatie va deveni fosta adresa mac sursa; adresa mac sursa va deveni adresa mac a interfetei curente unde a fost primit pachetul; sunt copiate mac-urile destinatie si sursa si in headerul ethernet; se verifica daca adresa mac destinatie din ARP requestul primit coincide cu adresa mac a interfetei pe care am primit pachetul; daca da, atunci se trimite pachetul de ARP reply inapoi
+- daca in schimb, pachetul primit este de tip ARP reply, se verifica mac-ul destinatie cu mac-ul interfetei pe care a fost primit pentru a intelege daca pachetul este destinat routerului curent sau nu
+- se salveaza in ARP table ip-ul si destinatia sursa primite in ARP reply
+- se trimit pachetele care asteapta in coada
+- in functia send_queued_packets se preiau pachete din coada atat timp cat coada nu este vida; se cauta best_route si daca exista intrare corespunzatoare in tabela ARP; daca nu exista, atunci se reintroduce in coada, altfel se actualizeaza ether_header-ul (source mac = mac-ul interfetei curente si destination mac = mac-ul corespunzator intrarii in tabela ARP; se trimite pachetul mai departe
+- functia send_icmp este utilizata pentru a trimite pachete de tip icmp
+- mai intai se aloca un header icmp, se completeaza tipul si codul; checksumul se zeroizeaza pt a fi calculat ulterior
+- se actualizeaza ether_header-ul prin interschimbarea lui source mac cu destination mac
+- se va crea un nou header ip prin copierea vechiului header ip
+- in noul header ip se actualizeaza ip-ul destinatie cu ip-ul sursa vechi, ip-ul sursa cu ip-ul interfetei curente, se rescrie ttl-ul la valoarea de 64, se reface campul tot_len cu dimensiunea noua a datelor aflate deasupra noului pachet ip + dimensiunea unui pachet ip (pachetul icmp are formatul eth_header + ip_header_nou + icmp_header + ip_header_vechi + 8 octeti din vechiul pachet
+- campul protocol este setat pe 1
+- se zeroizeaza checksumul si apoi se calculeaza
+- se aloca un buffer final pentru pachetul icmp; se copiaza pe rand headerul de ethernet, noul header ip, headerul icmp, vechiul header ip si 8 octeti din pachetul precedent
+- se calculeaza checksumul headerului icmp, se introduce in pachet
+- se trimite pachetul icmp
