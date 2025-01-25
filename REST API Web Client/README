@@ -1,0 +1,85 @@
+Serban Dragos-Andrei, 322CB
+
+- in realizarea temei, m-am folosit de fisierele client.c si requests.c, dar si de biblioteca
+parson pentru a crea obiecte JSON
+- in requests.c se regasesc cele 3 functii pentru a computa un request (GET, POST sau DELETE)
+- am plecat de la scheletul din laboratorul 9 si am realizat pe rand:
+- compute_get_request: se scrie pe primul rand metoda (GET) + url + query_params (optional)
++ versiunea protocolului (HTTP/1.1), pe a doua linie urmeaza hostul, apoi se adauga tokenul
+de autentificare pentru biblioteca (in cazul in care a fost primit ca parametru), apoi se
+adauga cookie-urile (daca exista vreunul), se returneaza stringul
+- compute_post_request: se scrie pe primul rand metoda (POST) + url + versiunea protocolului
+(HTTP/1.1), pe a doua linie urmeaza hostul, apoi urmeaza headerele obligatorii (Content-Type
+si Content-Length - calculat prin insumarea tuturor octetilor din body_data), apoi se adauga
+tokenul de autentificare pentru biblioteca (in cazul in care a fost primit ca parametru), apoi
+se adauga cookies, daca exista, iar la final se adauga si contentul din body_data_buffer, se
+returneaza mesajul
+- compute_delete_request: se scrie pe primul rand metoda (DELETE) + url + versiunea protocolului
+(HTTP/1.1), pe a doua linie urmeaza hostul, apoi se adauga tokenul de autentificare pentru
+biblioteca (in cazul in care a fost primit ca parametru), apoi urmeaza cookies (daca exista),
+la final se returneaza stringul
+- in client.c se afla partea principala a programului
+- se citeste de fiecare data o comanda de la tastatura
+- se porneste conexiunea la server
+- se verifica daca comanda este "exit"
+- daca comanda este exit, atunci se elibereaza spatiul folosit si se inchide programul
+- altfel, daca este "register", se insereaza username-ul si parola, se creeaza un obiect JSON
+cu ajutorul bibliotecii parson, recomandata in enuntul temei; in obiectul json sunt introduse
+username-ul si parola
+- se creeaza mesajul folosind functia compute_post_request si se trimite la server, apoi se
+asteapta pentru a se primi raspunsul
+- se verifica daca s-a primit un mesaj de eroare pentru username folosit deja; daca nu s-a
+primit, atunci se creeaza contul
+- daca comanda introdusa este "login", urmeaza sa fie introduse username-ul si parola, iar apoi
+sa se creeze un JSON cu ele cu ajutorul functiilor din biblioteca parson
+- se creeaza post_request-ul, se trimite la server
+- se primeste mesajul de la server
+- se ia fiecare linie din mesajul primit in parte, iar daca se gaseste eroare (username sau parola
+gresite) se afiseaza mesaj de eroare, daca se gaseste cookie-ul de autentificare, se salveaza si
+se afiseaza un mesaj de succes
+- daca comanda este "enter_library", se verifica mai intai daca suntem logati, apoi se computeaza
+mesajul si se trimite la server; se asteapta un raspuns
+- se verifica daca mesajul returnat este unul de eroare
+- se trece prin fiecare linie a mesajului; daca se gaseste authentication token-ul, atunci acesta
+se va salva intr-un string ce reprezinta authentication header-ul, se returneaza mesaj de succes
+- daca comanda este get_books, se verifica daca suntem conectati si avem token-ul de autentificare
+la biblioteca (altfel vom afisa un mesaj de eroare)
+- se creeaza get_request-ul si se transmite la server, se primeste apoi mesaj de la server
+- se verifica daca s-a primit eroare, altfel se itereaza prin vectorul de carti (folosind strtok
+pentru a elimina caracterele '{', '}', '[' si ']')
+- daca comanda este get_book, atunci urmeaza sa se deschida un prompt unde sa se introduca
+id-ul; se verifica daca este numar, altfel se afiseaza eroare
+- apoi se va verifica daca avem token-ul de acces la biblioteca, altfel se va afisa mesaj de
+eroare
+- se creeaza URL-ul si mesajul de get_request, se trimite la server, se asteapta un raspuns
+- se va itera prin fiecare subsir al raspunsului, delimitat de '\n'; avand 3 cazuri:
+- se gaseste un subsir cu datele cartii, in cazul acesta se va parsa JSON string-ul, asadar cu
+ajutorul functiilor din biblioteca parson se vor extrage datele cartii, acestea se vor afisa
+ulterior
+- nu se gaseste cartea => se afiseaza eroare
+- nu exista headerul de autentificare => se afiseaza mesaj de eroare
+- cazul in care ID-ul nu este integer => se afiseaza eroare
+- daca comanda este "add_book", atunci se va deschide un prompt si se vor introduce datele;
+se verifica de asemenea ca page_count sa fie integer
+- apoi se verifica daca avem cookie-ul de sesiune, headerul de autentificare, daca nu,
+atunci se afiseaza eroare
+- se creeaza un obiect JSON cu datele cartii, utilizand functiile din biblioteca parson
+- se computeaza post_request-ul, se transmite catre server
+- se asteapta un raspuns de la server
+- se verifica ce contine mesajul de la server: eroare din cauza parametrilor dati sau
+eroare din cauza faptului ca nu suntem autentificati la biblioteca sau eroare din cauza
+ca page_count nu este integer
+- daca nu a existat vreo eroare si cartea a fost introdusa in biblioteca, afisam un
+mesaj pentru a informa utilizatorul
+- daca comanda este "delete_book", atunci se va oferi prompt pentru ID, se citeste ID-ul,
+se verifica ca acesta sa fie integer
+- apoi se verifica daca avem cookie-ul de sesiune si header-ul de autentificare la biblioteca
+- se creeaza URL-ul, delete_request-ul, se trimite mesajul la server, se asteapta un raspuns
+- se verifica cu strtok daca s-a gasit vreo eroare (header-ul de autentificare nu este bun
+sau nu exista carte cu ID-ul dat) si se afiseaza mesaj de eroare
+- daca nu a existat vreo eroare, atunci se afiseaza mesaj de succes
+- daca comanda este logout, atunci se verifica daca chiar suntem conectati, se computeaza
+get_request-ul, se trimite la server, se asteapta raspuns, se verifica daca s-a intampinat
+vreo eroare; daca nu, atunci se afiseaza un mesaj de succes, se pierd session cookie-ul si
+auth_token_header-ul
+- la final se opreste conexiunea la server pentru oricare dintre comenzile date
